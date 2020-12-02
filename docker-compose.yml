@@ -1,0 +1,103 @@
+version: '3'
+services:
+  #Nginx
+  webserver:
+    image: sapoarmado/nginxssh:ssh
+    container_name: webserver
+    tty: true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "23:22"
+    networks:
+      - app-network
+ 
+  db:
+    image: mysql:5.7
+    volumes:
+      - ./srcs/db.sql:/docker-entrypoint-initdb.d/db.sql
+    environment:
+      MYSQL_DATABASE: 'db'
+      # So you don't have to use root, but you can if you like
+      MYSQL_USER: 'user'
+      # You can use whatever password you like
+      MYSQL_PASSWORD: 'password'
+      # Password for root access
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      # <Port exposed> : < MySQL Port running inside container>
+      - '3306:3306'
+  ftps:
+    image: sapoarmado/iromeroftps:latest
+    volumes:
+      - ./srcs:/home/admin
+    environment:
+      FTP_USER: admin
+      FTP_PASSWORD: admin
+    ports:
+      - "21:21"
+      - "15477:15477"
+  phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      ports:
+          - 5000:80
+      environment:
+          MYSQL_USER: user
+          MYSQL_PASSWORD: password
+          MYSQL_ROOT_PASSWORD: password
+  wordpress:
+     depends_on:
+       - db
+     image: wordpress:latest
+     ports:
+       - "5050:80"
+     environment:
+       WORDPRESS_DB_HOST: db:3306
+       WORDPRESS_DB_USER: root
+       WORDPRESS_DB_PASSWORD: password
+       WORDPRESS_DB_NAME: db
+  influxdb:
+      image: influxdb:latest
+      container_name: influxdb
+      environment:
+        INFLUXDB_DATA_USER: data
+        INFLUXDB_DATA_PW: data
+        INFLUXDB_DB: telegraf
+      ports:
+        - "8083:8083"
+        - "8086:8086"
+        - "8090:8090"
+      #volumes:
+        # Data persistency
+        # sudo mkdir -p /srv/docker/influxdb/data
+        #- /srv/docker/influxdb/data:/var/lib/influxdb
+
+  telegraf:
+      image: telegraf:latest
+      container_name: telegraf
+      volumes:
+        - ./srcs/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+      environment:
+        INFLUXDB_USER: data
+        INFLUXDB_USER_PASSWORD: data
+        INFLUXDB_URL: http://influxdb:8086
+        INFLUXDB_DB: telegraf
+
+  grafana:
+      image: grafana/grafana:latest
+      volumes:
+        - ./srcs/grafana/provisioning:/etc/grafana/provisioning
+        - ./srcs/grafana/dashboards:/var/lib/grafana/dashboards
+      container_name: grafana
+      environment:
+        INFLUXDB_GRAFANA_USER: admin
+        INFLUXDB_GRAFANA_PW: admin
+      ports:
+        - "3000:3000"
+      user: "0"
+    #Redes
+networks:
+  app-network:
+    driver: bridge
+volumes:
+    persistent:

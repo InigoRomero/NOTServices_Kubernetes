@@ -1,0 +1,13 @@
+FROM nginx:alpine
+
+RUN apk add --update openssh && \
+	ssh-keygen -f /etc/ssh/ssh_host_dsa_key -N '' -t dsa && \
+	ssh-keygen -f /etc/ssh/ssh_host_rsa_key -N '' -t rsa
+
+COPY entrypoint.sh	entrypoint.sh
+
+COPY nginx.conf tls.key tls.crt /etc/nginx/
+
+ENTRYPOINT sh entrypoint.sh
+
+EXPOSE 80 443 22
